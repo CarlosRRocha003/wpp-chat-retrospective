@@ -1,0 +1,4 @@
+data_extractor/data/
+data_extractor/venv/
+__pycache__/
+*.pyc

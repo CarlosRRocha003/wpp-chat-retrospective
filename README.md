@@ -16,3 +16,16 @@ python main.py
 docker build -t data-extractor:latest .
 docker run data-extractor:latest
 
+# Frontend
+
+## Build and Run
+
+### Locally
+
+npm run dev
+npm run build
+
+### Using Docker
+
+docker build -t frontend:latest .
+docker run -p 8080:80 frontend:latest

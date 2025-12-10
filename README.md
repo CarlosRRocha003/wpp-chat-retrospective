@@ -1,31 +1,33 @@
 # wpp-chat-retrospective
 An app to show a spotify like retrospective of a group chat in whatsapp
 
-# Virtual Environment
-## To activate
+## Virtual Environment
+### To activate
 venv/Scripts/activate
-## To deactivate
+### To deactivate
 deactivate
-## To generate requirements.txt
+### To generate requirements.txt
 pip freeze > requirements.txt
 
-# To run locally
+
+## Data Extractor
+### To run locally
 python main.py
 
-# Run using docker
+### Run using docker
 docker build -t data-extractor:latest .
 docker run data-extractor:latest
 
-# Frontend
+## Frontend
 
-## Build and Run
+### Build and Run
 
-### Locally
+#### Locally
 
 npm run dev
 npm run build
 
-### Using Docker
+#### Using Docker
 
 docker build -t frontend:latest .
 docker run -p 8080:80 frontend:latest

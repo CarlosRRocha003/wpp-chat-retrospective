@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { groupNameFromFile, parseChat, type ParsedChat } from './lib/parser'
 import { readChatFile } from './lib/zip'
-import { computeRetro, funnyMoments, FUNNY_METRICS, type ChatBubble, type FunnyMetric, type Retro } from './lib/stats'
+import { computeRetro, funnyMoments, FUNNY_METRICS, type ChatBubble, type FunnyMetric, type FunnyPick, type Retro } from './lib/stats'
 import { thumbnail } from './lib/photo'
 import Calibrate, { type MomentSets } from './components/Calibrate'
 import { decodeRetro, payloadFromHash } from './lib/share'
@@ -150,6 +150,14 @@ export default function App() {
         }
       }
       for (const f of retro.funnies) for (const m of f.options ?? [f.moment]) await attachMedia(m.bubbles, loaded.media)
+      // Slide de áudio ou figurinha só faz sentido se o arquivo veio junto (export "com mídia" em .zip)
+      retro.funnies = retro.funnies.flatMap((f): FunnyPick[] => {
+        const options = (f.options ?? [f.moment]).filter((m) => {
+          const t = m.bubbles[m.trigger]
+          return f.category === 'geral' || (f.category === 'audio' ? !!t.audio : !!t.media)
+        })
+        return options.length ? [{ ...f, moment: options[0], options }] : []
+      })
       for (const p of retro.people) if (p.funny) await attachMedia(p.funny.bubbles, loaded.media)
       const nextLoaded = { ...loaded, group: result.group, names: result.names, photos: result.photos }
 

@@ -5,3 +5,7 @@ __pycache__/
 frontend/node_modules/
 frontend/.env
 frontend/.env.*
+
+# Endereços públicos do cofre (sem segredos), usados no build
+!frontend/.env.development
+!frontend/.env.production

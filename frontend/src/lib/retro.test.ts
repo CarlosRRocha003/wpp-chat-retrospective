@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { attachmentName, captionOf, classify, groupNameFromFile, parseChat } from './parser'
-import { availablePeriods, computeRetro, funnyMoments, stripForShare } from './stats'
+import { availablePeriods, computeRetro, customPeriod, funnyMoments, periodKind, stripForShare } from './stats'
 import { laughType, emojis } from './text'
 import { generateSampleChat } from './sample'
 import { decodeRetro, encodeRetro } from './share'
@@ -276,6 +276,29 @@ describe('retrospectiva', () => {
     const payload = await encodeRetro(shared)
     expect(payload.length).toBeLessThan(12_000)
     expect(await decodeRetro(payload)).toEqual(shared)
+  })
+})
+
+describe('período personalizado', () => {
+  it('calcula só o intervalo escolhido', () => {
+    const chat = parseChat(generateSampleChat(2026, new Date(2026, 10, 14)))
+    const p = customPeriod('2026-03-01', '2026-05-31')
+    expect(p.label).toBe('01/03 a 31/05/2026')
+    const r = computeRetro(chat.messages, 'x', p)
+    expect(periodKind(r)).toBe('custom')
+    expect(r.months.map((m) => m.label)).toEqual(['mar', 'abr', 'mai'])
+    const inRange = chat.messages.filter((m) => m.author && m.ts >= p.start && m.ts < p.end).length
+    expect(r.totals.messages).toBe(inRange)
+  })
+
+  it('atravessa a virada do ano com os meses em ordem', () => {
+    const text = [generateSampleChat(2025, new Date(2025, 11, 31)), generateSampleChat(2026, new Date(2026, 10, 14))].join('\n')
+    const chat = parseChat(text)
+    const p = customPeriod('2025-11-15', '2026-02-10')
+    expect(p.label).toBe('15/11/2025 a 10/02/2026')
+    const r = computeRetro(chat.messages, 'x', p)
+    expect(r.months.map((m) => m.label)).toEqual(['nov/25', 'dez/25', 'jan/26', 'fev/26'])
+    expect(r.months.reduce((a, m) => a + m.count, 0)).toBe(r.totals.messages)
   })
 })
 

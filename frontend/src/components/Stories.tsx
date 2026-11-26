@@ -138,6 +138,11 @@ export default function Stories({ retro: baseRetro, shared, onClose, onNew }: Pr
   }, [retro, shared, saveSummary, saveCard, copyLink, onNew, nextFunny, personIdx])
   const slides = mode === 'main' ? mainSlides : mode === 'rankings' ? rankingSlides : personSlides
 
+  const backToMain = useCallback(() => {
+    setMode('main')
+    setIndex(mainSlides.findIndex((s) => s.id === 'end'))
+  }, [mainSlides])
+
   const go = useCallback((delta: number) => setIndex((i) => Math.max(0, Math.min(slides.length - 1, i + delta))), [slides.length])
 
   useEffect(() => {
@@ -150,11 +155,15 @@ export default function Stories({ retro: baseRetro, shared, onClose, onNew }: Pr
       if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') go(1)
       if (e.key === 'ArrowLeft' || e.key === 'PageUp') go(-1)
       if (e.key === 'f' || e.key === 'F') toggleTv()
-      if (e.key === 'Escape') onClose()
+      // Fora da sequência principal, Esc volta para a lista de pessoas em vez de fechar tudo
+      if (e.key === 'Escape') {
+        if (mode !== 'main') backToMain()
+        else onClose()
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [go, onClose, sharing, toggleTv])
+  }, [go, onClose, sharing, toggleTv, mode, backToMain])
 
   const tap = (e: MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -187,7 +196,20 @@ export default function Stories({ retro: baseRetro, shared, onClose, onNew }: Pr
             ))}
           </div>
           <div className="story-bar">
-            <span>{mode === 'main' ? retro.group : mode === 'rankings' ? `${retro.group} · rankings` : `${retro.group} · ${retro.people[personIdx]?.name ?? ''}`}</span>
+            {mode === 'main' ? (
+              <span>{retro.group}</span>
+            ) : (
+              <button
+                className="back-btn"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  backToMain()
+                }}
+              >
+                ← {mode === 'rankings' ? 'Rankings' : retro.people[personIdx]?.name}
+                <small>voltar</small>
+              </button>
+            )}
             <span className="bar-actions">
               <button
                 className="tv-btn"

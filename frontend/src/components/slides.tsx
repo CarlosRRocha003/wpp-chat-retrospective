@@ -1,11 +1,14 @@
 import type { ReactNode } from 'react'
 import type { FunnyCategory, PersonStats, Retro } from '../lib/stats'
+import { periodKind } from '../lib/stats'
 import { LAUGH_LABEL, type LaughType } from '../lib/text'
 import { awardInfo, durationLabel, silenceLabel } from '../lib/awards'
 import { WEEKDAYS, WEEKDAYS_SHORT, clock, dateLong, firstName, gapLabel, monthFull, num, paceLabel, plural } from '../lib/format'
 import { ColumnChart, CountUp, Podium, RankBars } from './charts'
 import Avatar from './Avatar'
 import ChatView from './ChatView'
+import AwardsGrid from './AwardsGrid'
+import { AvatarStack, Who } from './People'
 
 export interface Theme {
   bg: string
@@ -46,6 +49,28 @@ export interface SlideHandlers {
   onBackToPeople?: () => void
 }
 
+// Foto (ou iniciais) de uma pessoa, no formato que os rankings esperam
+const personRef = (r: Retro, i: number) => ({ name: r.people[i]?.name ?? '?', index: i, photo: r.people[i]?.photo })
+
+/** As expressões que mudam conforme o período: um ano, desde o começo ou datas escolhidas. */
+function periodWords(r: Retro) {
+  const kind = periodKind(r)
+  const label = r.period.label
+  return {
+    kind,
+    isYear: kind === 'year',
+    retro: kind === 'year' ? `Retrospectiva ${label}` : kind === 'custom' ? `Retrospectiva · ${label}` : 'Retrospectiva completa',
+    within: kind === 'year' ? 'no ano' : kind === 'custom' ? 'no período' : 'nesse tempo',
+    total: kind === 'year' ? `Em ${label}` : kind === 'custom' ? 'No período' : 'No total',
+    whole: kind === 'year' ? 'O ano' : kind === 'custom' ? 'O período' : 'A conversa',
+    ofWhole: kind === 'year' ? 'do ano' : kind === 'custom' ? 'do período' : '',
+    // "do ano", "do período" ou "de todos os tempos", para títulos curtos
+    ofAll: kind === 'year' ? 'do ano' : kind === 'custom' ? 'do período' : 'de todos os tempos',
+    awards: kind === 'year' ? `de ${label}` : kind === 'custom' ? 'do período' : 'de sempre',
+    rankings: kind === 'year' ? `de ${label}` : kind === 'custom' ? 'do período' : 'de todos os tempos',
+  }
+}
+
 function argmax(values: number[]): number {
   let best = 0
   values.forEach((v, i) => {
@@ -58,17 +83,19 @@ export function buildSlides(r: Retro, h: SlideHandlers): SlideDef[] {
   const name = (i: number) => r.people[i]?.name ?? '?'
   const slides: SlideDef[] = []
   const add = (id: string, theme: keyof typeof THEMES, content: ReactNode) => slides.push({ id, theme: THEMES[theme], content })
-  const isYear = /^\d{4}$/.test(r.period.label)
-  const periodWord = isYear ? 'no ano' : 'nesse tempo'
+  const words = periodWords(r)
+  const isYear = words.isYear
+  const periodWord = words.within
 
   // 1. Abertura
   add(
     'intro',
     'night',
     <>
-      <span className="kicker">{isYear ? `Retrospectiva ${r.period.label}` : 'Retrospectiva completa'}</span>
+      <span className="kicker">{words.retro}</span>
       <div className="spacer" />
       <h2 style={{ fontSize: 'clamp(44px, 14vw, 72px)', color: 'var(--lime)', overflowWrap: 'anywhere' }}>{r.group}</h2>
+      <AvatarStack r={r} people={r.people.slice(0, 12).map((_, i) => i)} size={46} />
       <p className="lead">
         {plural(r.people.length, 'pessoa', 'pessoas')}, {plural(r.totals.messages, 'mensagem', 'mensagens')} e muita história.
       </p>
@@ -83,7 +110,7 @@ export function buildSlides(r: Retro, h: SlideHandlers): SlideDef[] {
     'total',
     'lime',
     <>
-      <span className="kicker">{isYear ? `Em ${r.period.label}` : 'No total'}, vocês trocaram</span>
+      <span className="kicker">{words.total}, vocês trocaram</span>
       <div className="big">
         <CountUp value={r.totals.messages} />
       </div>
@@ -105,7 +132,7 @@ export function buildSlides(r: Retro, h: SlideHandlers): SlideDef[] {
   )
 
   // 3. Quem mais fala
-  const talkers = r.people.map((p) => ({ label: p.name, value: p.messages }))
+  const talkers = r.people.map((p, i) => ({ label: p.name, value: p.messages, people: [personRef(r, i)] }))
   add(
     'ranking',
     'violet',
@@ -145,7 +172,8 @@ export function buildSlides(r: Retro, h: SlideHandlers): SlideDef[] {
               </div>
               {d.topic && <span className="day-topic">{d.topic}</span>}
               {d.holiday && <span className="chip day-holiday">🎉 {d.holiday}</span>}
-              <span className="day-meta">
+              <span className="day-meta with-avatar">
+                <Avatar name={name(d.person)} index={d.person} photo={r.people[d.person]?.photo} size={22} />
                 {firstName(name(d.person))} foi quem mais falou ({num(d.personCount)}) · pico às {d.peakHour}h
                 {d.photos >= 10 ? ` · ${num(d.photos)} fotos e vídeos` : ''}
               </span>
@@ -166,7 +194,7 @@ export function buildSlides(r: Retro, h: SlideHandlers): SlideDef[] {
     const peakMonth = inRange.reduce((a, b) => (b.count > a.count ? b : a), inRange[0])
     // Mês incompleto (grupo criado no meio dele, ou o mês atual) não concorre a mais parado
     const complete = inRange.filter(
-      (_m, i) => !isYear || ((i !== 0 || first.getDate() <= 5) && (i !== r.months.length - 1 || last.getDate() >= 25)),
+      (_m, i) => words.kind === 'all' || ((i !== 0 || first.getDate() <= 5) && (i !== r.months.length - 1 || last.getDate() >= 25)),
     )
     const quietMonth = complete.length > 1 ? complete.reduce((a, b) => (b.count < a.count ? b : a), complete[0]) : peakMonth
     add(
@@ -243,13 +271,13 @@ export function buildSlides(r: Retro, h: SlideHandlers): SlideDef[] {
         {r.people[owl].night > 0 && (
           <div className="fact">
             <span className="emoji">🦉</span>
-            <b>{firstName(name(owl))}</b>
+            <Who r={r} i={owl} />
             <span>{plural(r.people[owl].night, 'mensagem', 'mensagens')} de madrugada</span>
           </div>
         )}
         <div className="fact">
           <span className="emoji">⏰</span>
-          <b>{firstName(name(opener))}</b>
+          <Who r={r} i={opener} />
           <span>abriu o dia {plural(r.people[opener].dayOpeners, 'vez', 'vezes')}</span>
         </div>
       </div>
@@ -352,7 +380,7 @@ export function buildSlides(r: Retro, h: SlideHandlers): SlideDef[] {
                 {r.longestLaugh.text.length > 28 ? r.longestLaugh.text.slice(0, 28) + '…' : r.longestLaugh.text}
               </b>
               <span>
-                O maior kkk do ano, com {r.longestLaugh.text.length} letras, foi de {firstName(name(r.longestLaugh.person))}.
+                O maior kkk {words.ofAll}, com {r.longestLaugh.text.length} letras, foi de {firstName(name(r.longestLaugh.person))}.
               </span>
             </div>
           )}
@@ -432,17 +460,20 @@ export function buildSlides(r: Retro, h: SlideHandlers): SlideDef[] {
       'dynamics',
       'mint',
       <>
-        <span className="kicker">As duplas do ano</span>
+        <span className="kicker">As duplas {words.ofAll}</span>
+        <AvatarStack r={r} people={[pair[0], pair[1]]} size={78} />
         <h2>
           {firstName(name(pair[0]))} & {firstName(name(pair[1]))}
         </h2>
         <p className="lead">{num(pair[2])} respostas trocadas em menos de 5 minutos.</p>
-        <RankBars items={r.pairs.slice(0, 3).map(([a, b, n]) => ({ label: `${firstName(name(a))} & ${firstName(name(b))}`, value: n }))} />
+        <RankBars
+          items={r.pairs.slice(0, 3).map(([a, b, n]) => ({ label: `${firstName(name(a))} & ${firstName(name(b))}`, value: n, people: [personRef(r, a), personRef(r, b)] }))}
+        />
         <div className="spacer" />
         {fastest && (
           <div className="fact">
             <span className="emoji">🏎️</span>
-            <b>{name(fastest.i)}</b>
+            <Who r={r} i={fastest.i} full />
             <span>responde mais rápido: {durationLabel(fastest.s! * 1000)}, na mediana</span>
           </div>
         )}
@@ -463,7 +494,7 @@ export function buildSlides(r: Retro, h: SlideHandlers): SlideDef[] {
         <div className="catch">
           {withCatch.slice(0, 9).map(({ i, c }) => (
             <div className="catch-row" key={i}>
-              <b>{name(i)}</b>
+              <Who r={r} i={i} full />
               <div>
                 {c.map((w) => (
                   <span className="chip" key={w}>
@@ -526,8 +557,8 @@ export function buildSlides(r: Retro, h: SlideHandlers): SlideDef[] {
       'sky',
       <>
         <span className="kicker">Do começo ao fim</span>
-        <h2>{isYear ? 'O ano' : 'A conversa'} em duas mensagens</h2>
-        <span className="kicker">Primeira mensagem {isYear ? 'do ano' : ''}</span>
+        <h2>{words.whole} em duas mensagens</h2>
+        <span className="kicker">Primeira mensagem {words.ofWhole}</span>
         <div className="quote">“{r.first.text}”</div>
         <p className="muted">
           {name(r.first.person)}, {dateLong(r.first.ts, !isYear)}
@@ -547,20 +578,10 @@ export function buildSlides(r: Retro, h: SlideHandlers): SlideDef[] {
     'awards',
     'night',
     <>
-      <span className="kicker">Os prêmios de {isYear ? r.period.label : 'sempre'}</span>
+      <span className="kicker">Os prêmios {words.awards}</span>
       <h2>Cada um com seu troféu</h2>
-      <div className="awards" onClick={(e) => e.stopPropagation()}>
-        {r.awards.map((a) => {
-          const info = awardInfo(a, r)
-          return (
-            <button className="award" key={a.person} onClick={() => h.onPerson(a.person)}>
-              <span className="e">{info.emoji}</span>
-              <b>{info.title}</b>
-              <span>{firstName(name(a.person))}</span>
-            </button>
-          )
-        })}
-      </div>
+      <p className="muted">Toque num cartão para ver o porquê.</p>
+      <AwardsGrid retro={r} />
     </>,
   )
 
@@ -571,11 +592,12 @@ export function buildSlides(r: Retro, h: SlideHandlers): SlideDef[] {
     <>
       <span className="kicker">E você?</span>
       <h2>A retrospectiva de cada um</h2>
-      <p className="muted">Toque num nome para ver os números da pessoa.</p>
-      <div className="picker" onClick={(e) => e.stopPropagation()}>
+      <p className="muted">Toque em alguém para ver os números da pessoa.</p>
+      <div className="people-grid" onClick={(e) => e.stopPropagation()}>
         {r.people.slice(0, 30).map((p, i) => (
-          <button key={i} onClick={() => h.onPerson(i)}>
-            {p.name}
+          <button key={i} className="person-tile" onClick={() => h.onPerson(i)}>
+            <Avatar name={p.name} index={i} photo={p.photo} size={56} />
+            <span>{firstName(p.name)}</span>
           </button>
         ))}
       </div>
@@ -624,7 +646,7 @@ const RANKING_THEMES: Array<keyof typeof THEMES> = ['lime', 'coral', 'sky', 'pin
 
 /** A segunda parte: um top por slide. */
 export function buildRankingSlides(r: Retro, h: SlideHandlers): SlideDef[] {
-  const isYear = /^\d{4}$/.test(r.period.label)
+  const words = periodWords(r)
   const typed = r.mediaTyped
   const topLaugh = (p: PersonStats) => {
     const best = (Object.entries(p.laughTypes) as [LaughType, number][]).sort((a, b) => b[1] - a[1])[0]
@@ -692,7 +714,7 @@ export function buildRankingSlides(r: Retro, h: SlideHandlers): SlideDef[] {
           <div className="spacer" />
           <h2 style={{ fontSize: 'clamp(44px, 14vw, 72px)' }}>Os rankings</h2>
           <p className="lead">
-            {active.length} disputas {isYear ? `de ${r.period.label}` : 'de todos os tempos'}. Quem ficou em primeiro em cada uma?
+            {active.length} disputas {words.rankings}. Quem ficou em primeiro em cada uma?
           </p>
           <div className="spacer" />
           <p className="muted">Toque à direita para avançar →</p>
@@ -770,7 +792,8 @@ export function buildPersonSlides(r: Retro, i: number, h: SlideHandlers): SlideD
   if (!p) return []
   const who = firstName(p.name)
   const name = (k: number) => r.people[k]?.name ?? '?'
-  const isYear = /^\d{4}$/.test(r.period.label)
+  const words = periodWords(r)
+  const isYear = words.isYear
   const n = r.people.length
   const slides: SlideDef[] = []
   const add = (id: string, theme: keyof typeof THEMES, content: ReactNode) => slides.push({ id: `p${i}-${id}`, theme: THEMES[theme], content })
@@ -784,7 +807,7 @@ export function buildPersonSlides(r: Retro, i: number, h: SlideHandlers): SlideD
     'night',
     <>
       <span className="kicker">
-        {isYear ? `Retrospectiva ${r.period.label}` : 'Retrospectiva'} · {r.group}
+        {words.retro} · {r.group}
       </span>
       <div className="spacer" />
       <Avatar name={p.name} index={i} photo={p.photo} size={120} />
@@ -1010,6 +1033,7 @@ export function buildPersonSlides(r: Retro, i: number, h: SlideHandlers): SlideD
       'mint',
       <>
         <span className="kicker">Com quem {who} se conecta</span>
+        {p.partner >= 0 && <AvatarStack r={r} people={[i, p.partner]} size={64} />}
         {p.partner >= 0 && (
           <h2>
             {who} & {firstName(name(p.partner))}
@@ -1019,13 +1043,13 @@ export function buildPersonSlides(r: Retro, i: number, h: SlideHandlers): SlideD
         {p.laughedBy.length > 0 && (
           <div className="conn">
             <b>Quem mais riu das mensagens de {who}</b>
-            <RankBars items={p.laughedBy.map(([k, c]) => ({ label: name(k), value: c }))} max={3} />
+            <RankBars items={p.laughedBy.map(([k, c]) => ({ label: name(k), value: c, people: [personRef(r, k)] }))} max={3} />
           </div>
         )}
         {p.laughedAt.length > 0 && (
           <div className="conn">
             <b>De quem {who} mais riu</b>
-            <RankBars items={p.laughedAt.map(([k, c]) => ({ label: name(k), value: c }))} max={3} />
+            <RankBars items={p.laughedAt.map(([k, c]) => ({ label: name(k), value: c, people: [personRef(r, k)] }))} max={3} />
           </div>
         )}
       </>,

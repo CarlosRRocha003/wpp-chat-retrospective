@@ -30,6 +30,8 @@ export interface RankItem {
   label: string
   value: number
   display?: string
+  /** Pessoas da linha (uma, ou duas numa dupla), para mostrar a foto ao lado do nome */
+  people?: { name: string; index: number; photo?: string }[]
 }
 
 export function RankBars({ items, max = 8 }: { items: RankItem[]; max?: number }) {
@@ -42,7 +44,16 @@ export function RankBars({ items, max = 8 }: { items: RankItem[]; max?: number }
         <div key={item.label} className={`rank-row${i === 0 ? ' top' : ''}`}>
           <span className="pos">{i + 1}</span>
           <div className="who">
-            <span>{item.label}</span>
+            <span className="who-name">
+              {item.people && (
+                <span className="avatars">
+                  {item.people.map((p) => (
+                    <Avatar key={p.index} name={p.name} index={p.index} photo={p.photo} size={i === 0 ? 30 : 24} />
+                  ))}
+                </span>
+              )}
+              <span className="who-label">{item.label}</span>
+            </span>
             <div className="bar" style={{ width: `${Math.max(2, (item.value / top) * 100)}%`, animationDelay: `${0.1 + i * 0.06}s` }} />
           </div>
           <span className="val">{item.display ?? num(item.value)}</span>

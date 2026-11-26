@@ -187,7 +187,7 @@ export const FALLBACK_AWARDS: Record<string, { title: string; emoji: string; des
   fantasma: {
     title: 'Modo fantasma',
     emoji: '👻',
-    describe: (p) => `${fmt(p.messages)} mensagens no ano todo. Lê tudo, fala pouco`,
+    describe: (p) => `${fmt(p.messages)} mensagens no período todo. Lê tudo, fala pouco`,
   },
   presenca: {
     title: 'Presença garantida',

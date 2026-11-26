@@ -113,7 +113,7 @@ export interface LongText {
 export interface Retro {
   v: 1
   group: string
-  period: { label: string; start: number; end: number }
+  period: { label: string; start: number; end: number; kind?: PeriodKind }
   people: PersonStats[]
   totals: {
     messages: number
@@ -151,10 +151,28 @@ export interface Retro {
   excerpts: boolean
 }
 
+export type PeriodKind = 'year' | 'all' | 'custom'
+
 export interface Period {
   label: string
   start: number
-  end: number
+  end: number // exclusivo
+  kind?: PeriodKind
+}
+
+/** Tipo do período (links antigos não guardavam: deduz pelo rótulo). */
+export function periodKind(r: Pick<Retro, 'period'>): PeriodKind {
+  return r.period.kind ?? (/^\d{4}$/.test(r.period.label) ? 'year' : 'all')
+}
+
+const pad2 = (n: number) => String(n).padStart(2, '0')
+
+/** Período personalizado a partir de duas datas no formato do campo de data (aaaa-mm-dd). */
+export function customPeriod(from: string, to: string): Period {
+  const [y1, m1, d1] = from.split('-').map(Number)
+  const [y2, m2, d2] = to.split('-').map(Number)
+  const label = y1 === y2 ? `${pad2(d1)}/${pad2(m1)} a ${pad2(d2)}/${pad2(m2)}/${y2}` : `${pad2(d1)}/${pad2(m1)}/${y1} a ${pad2(d2)}/${pad2(m2)}/${y2}`
+  return { label, start: new Date(y1, m1 - 1, d1).getTime(), end: new Date(y2, m2 - 1, d2 + 1).getTime(), kind: 'custom' }
 }
 
 const HOUR = 3_600_000
@@ -200,8 +218,9 @@ export function availablePeriods(messages: Message[]): Period[] {
     label: String(y),
     start: new Date(y, 0, 1).getTime(),
     end: new Date(y + 1, 0, 1).getTime(),
+    kind: 'year' as const,
   }))
-  if (sorted.length > 1) periods.push({ label: 'Desde o começo', start: 0, end: 8.64e15 })
+  if (sorted.length > 1) periods.push({ label: 'Desde o começo', start: 0, end: 8.64e15, kind: 'all' })
   return periods
 }
 
@@ -271,7 +290,7 @@ export function computeRetro(all: Message[], group: string, period: Period): Ret
         new Date(msgs[0].ts).getMonth() +
         1
       : 0
-  const singleYear = period.end - period.start <= 366 * DAY
+  const singleYear = msgs.length === 0 || new Date(msgs[0].ts).getFullYear() === new Date(msgs[msgs.length - 1].ts).getFullYear()
   const monthKey = (d: Date) =>
     singleYear ? MONTHS[d.getMonth()] : spanMonths > 24 ? String(d.getFullYear()) : `${MONTHS[d.getMonth()]}/${String(d.getFullYear()).slice(2)}`
 
@@ -472,7 +491,15 @@ export function computeRetro(all: Message[], group: string, period: Period): Ret
     const lastMonth = msgs.length ? new Date(msgs[msgs.length - 1].ts).getMonth() : 11
     months = MONTHS.slice(firstMonth, lastMonth + 1).map((label) => ({ label, count: monthCounts.get(label) ?? 0 }))
   }
-  else months = [...monthCounts.entries()].map(([label, count]) => ({ label, count }))
+  else if (spanMonths <= 24) {
+    // Período atravessando a virada do ano: todos os meses em ordem, inclusive os sem mensagem
+    months = []
+    const d = new Date(new Date(msgs[0].ts).getFullYear(), new Date(msgs[0].ts).getMonth(), 1)
+    for (let k = 0; k < spanMonths; k++, d.setMonth(d.getMonth() + 1)) {
+      const label = monthKey(d)
+      months.push({ label, count: monthCounts.get(label) ?? 0 })
+    }
+  } else months = [...monthCounts.entries()].map(([label, count]) => ({ label, count }))
 
   // Por pessoa: meses, dias ativos e o dia em que mais falou
   people.forEach((ps, p) => {
@@ -546,7 +573,12 @@ export function computeRetro(all: Message[], group: string, period: Period): Ret
   const retro: Retro = {
     v: 1,
     group,
-    period: { label: period.label, start: msgs[0]?.ts ?? period.start, end: msgs[msgs.length - 1]?.ts ?? period.end },
+    period: {
+      label: period.label,
+      start: msgs[0]?.ts ?? period.start,
+      end: msgs[msgs.length - 1]?.ts ?? period.end,
+      kind: period.kind ?? (/^\d{4}$/.test(period.label) ? 'year' : 'all'),
+    },
     people,
     totals,
     mediaTyped: MEDIA_KINDS.some((k) => k !== 'media' && totals.media[k] > 0),

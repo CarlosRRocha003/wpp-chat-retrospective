@@ -673,6 +673,9 @@ h3 {
   display: grid;
   gap: 10px;
   overflow: auto;
+  /* A lista rola e corta o que passa da borda: folga para o anel das fotos */
+  padding: 5px;
+  margin: -5px;
 }
 .catch-row {
   display: grid;
@@ -701,8 +704,25 @@ h3 {
   padding: 12px;
   background: rgba(255, 245, 228, 0.1);
   display: grid;
-  gap: 2px;
+  gap: 4px;
   align-content: start;
+  transition: background 0.2s;
+}
+.award.open {
+  grid-column: 1 / -1;
+  background: rgba(255, 245, 228, 0.2);
+  animation: rise 0.3s both;
+}
+.award-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.award .award-why {
+  font-size: 14px;
+  font-weight: 600;
+  opacity: 1;
+  line-height: 1.35;
 }
 .award:hover {
   background: rgba(255, 245, 228, 0.18);
@@ -1405,4 +1425,107 @@ h3 {
 }
 .conn > b {
   font-size: 15px;
+}
+
+/* Fotos espalhadas pelos slides */
+.avatar-stack {
+  display: flex;
+  flex-wrap: wrap;
+  row-gap: 6px;
+  padding-left: 10px;
+}
+.avatar-stack .avatar {
+  margin-left: -10px;
+}
+.with-avatar {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.who-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.who-name .avatars {
+  display: flex;
+  flex: none;
+}
+.who-name .avatars .avatar + .avatar {
+  margin-left: -8px;
+}
+.who-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rank-row .who-name .avatar {
+  box-shadow: 0 0 0 2px rgba(22, 18, 31, 0.12);
+}
+
+/* Grade de pessoas no último slide */
+.people-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(74px, 1fr));
+  gap: 10px;
+  overflow: auto;
+  padding: 6px;
+  margin: -6px;
+}
+.person-tile {
+  all: unset;
+  cursor: pointer;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 8px 4px;
+  border-radius: 16px;
+  font-weight: 700;
+  font-size: 13px;
+  text-align: center;
+  transition: background 0.15s;
+}
+.person-tile:hover,
+.person-tile:focus-visible {
+  background: rgba(22, 18, 31, 0.1);
+}
+.person-tile span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Voltar, na barra do topo */
+.story-bar .back-btn {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 800;
+  border-radius: 999px;
+  padding: 5px 12px;
+  background: rgba(127, 127, 127, 0.22);
+}
+.story-bar .back-btn small {
+  font-weight: 600;
+  opacity: 0.75;
+}
+
+/* Período personalizado */
+.date-range {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.date-range label {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #cfc5b3;
+}
+.date-range .input {
+  color-scheme: dark;
 }

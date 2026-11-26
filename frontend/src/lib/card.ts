@@ -1,4 +1,5 @@
 import type { Retro } from './stats'
+import { periodKind } from './stats'
 import { awardInfo } from './awards'
 import { LAUGH_LABEL, type LaughType } from './text'
 import { dateLong, firstName, num } from './format'
@@ -91,7 +92,7 @@ function footer(ctx: CanvasRenderingContext2D, color: string) {
 }
 
 function periodText(r: Retro) {
-  return /^\d{4}$/.test(r.period.label) ? r.period.label : 'desde o começo'
+  return periodKind(r) === 'all' ? 'desde o começo' : r.period.label
 }
 
 export async function drawPersonCard(r: Retro, i: number): Promise<HTMLCanvasElement> {
@@ -257,7 +258,7 @@ export async function drawSummaryCard(r: Retro): Promise<HTMLCanvasElement> {
   }
   if (r.topEmojis.length) {
     ctx.font = `600 40px ${BODY}`
-    ctx.fillText('Emojis do ano:', X, y)
+    ctx.fillText('Emojis favoritos:', X, y)
     ctx.font = `64px ${BODY}`
     ctx.fillText(r.topEmojis.slice(0, 5).map(([e]) => e).join(' '), X + 300, y + 8)
     y += 90

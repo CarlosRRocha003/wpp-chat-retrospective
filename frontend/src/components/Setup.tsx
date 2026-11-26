@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import type { ParsedChat } from '../lib/parser'
 import { looksLikePhone } from '../lib/parser'
-import { availablePeriods, type Period } from '../lib/stats'
+import { availablePeriods, customPeriod, type Period } from '../lib/stats'
 import { num } from '../lib/format'
 import { squarePhoto } from '../lib/photo'
 import Avatar from './Avatar'
@@ -31,7 +31,29 @@ export default function Setup({ chat, group: initialGroup, initialNames, initial
     return c
   }, [chat])
   const [group, setGroup] = useState(initialGroup)
-  const [periodIdx, setPeriodIdx] = useState(0)
+  const [periodSel, setPeriodSel] = useState('0') // índice da lista ou 'custom'
+  // Datas da conversa, para limitar e preencher o período personalizado
+  const range = useMemo(() => {
+    const ts = chat.messages.filter((m) => m.author).map((m) => m.ts)
+    const iso = (t: number) => {
+      const d = new Date(t)
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    }
+    // A configuração só abre com pelo menos uma mensagem; o 0 nunca é usado de verdade
+    const first = ts.length ? Math.min(...ts) : 0
+    const last = ts.length ? Math.max(...ts) : 0
+    return { min: iso(first), max: iso(last), yearStart: iso(Math.max(first, new Date(new Date(last).getFullYear(), 0, 1).getTime())) }
+  }, [chat])
+  const [from, setFrom] = useState(range.yearStart)
+  const [to, setTo] = useState(range.max)
+  const custom = periodSel === 'custom'
+  const chosen: Period | null = custom ? (from && to && from <= to ? customPeriod(from, to) : null) : (periods[Number(periodSel)] ?? null)
+  const chosenStart = chosen?.start ?? 0
+  const chosenEnd = chosen?.end ?? 0
+  const inChosen = useMemo(
+    () => chat.messages.filter((m) => m.author && m.ts >= chosenStart && m.ts < chosenEnd).length,
+    [chat, chosenStart, chosenEnd],
+  )
   const [names, setNames] = useState<Record<string, string>>(() => initialNames ?? Object.fromEntries(chat.authors.map((a) => [a, a])))
 
   const [photos, setPhotos] = useState<Record<string, string>>(initialPhotos ?? {})
@@ -104,14 +126,32 @@ export default function Setup({ chat, group: initialGroup, initialNames, initial
 
       <label className="field">
         <span>Período</span>
-        <select className="select" value={periodIdx} onChange={(e) => setPeriodIdx(Number(e.target.value))}>
+        <select className="select" value={periodSel} onChange={(e) => setPeriodSel(e.target.value)}>
           {periods.map((p, i) => (
-            <option key={p.label} value={i}>
+            <option key={p.label} value={String(i)}>
               {p.label}
             </option>
           ))}
+          <option value="custom">Período personalizado…</option>
         </select>
       </label>
+      {custom && (
+        <div className="field">
+          <div className="date-range">
+            <label>
+              De
+              <input className="input" type="date" value={from} min={range.min} max={range.max} onChange={(e) => setFrom(e.target.value)} />
+            </label>
+            <label>
+              Até
+              <input className="input" type="date" value={to} min={range.min} max={range.max} onChange={(e) => setTo(e.target.value)} />
+            </label>
+          </div>
+          <p className={`hint${chosen && inChosen > 0 ? '' : ' warn'}`}>
+            {!chosen ? 'A data de início precisa vir antes da data de fim.' : inChosen > 0 ? `${num(inChosen)} mensagens nesse período.` : 'Nenhuma mensagem nesse período.'}
+          </p>
+        </div>
+      )}
 
       <div className="field">
         <span>Participantes</span>
@@ -192,10 +232,11 @@ export default function Setup({ chat, group: initialGroup, initialNames, initial
       <div className="setup-actions">
         <button
           className="btn"
+          disabled={!chosen || inChosen === 0}
           onClick={() =>
             onDone({
               group: group.trim() || initialGroup,
-              period: periods[periodIdx],
+              period: chosen!,
               names: Object.fromEntries(chat.authors.map((a) => [a, (names[a] ?? a).trim() || a])),
               photos,
               ai,
